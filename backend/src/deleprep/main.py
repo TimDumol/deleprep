@@ -1,11 +1,50 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from .routers import auth, skills, tasks
-from .database import engine, Base
+from .database import engine, Base, SessionLocal
+from . import models, auth as auth_utils
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="DELE A2 Prep API")
+
+@app.on_event("startup")
+def create_dummy_user():
+    db = SessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.id == 1).first()
+        if not user:
+            # Auto-create user with dummy email and hashed password if missing
+            hashed_pw = auth_utils.get_password_hash("password123")
+            dummy_user = models.User(id=1, email="test@example.com", hashed_password=hashed_pw)
+            db.add(dummy_user)
+            db.commit()
+
+            # Optionally populate some tags to avoid foreign key errors on progress
+            tags = db.query(models.SkillTag).all()
+            if not tags:
+                new_tags = [
+                    models.SkillTag(id="1", name="Pretérito Indefinido", category="Grammar"),
+                    models.SkillTag(id="2", name="Pretérito Imperfecto", category="Grammar"),
+                    models.SkillTag(id="3", name="Vocabulary: Work/Study", category="Vocabulary"),
+                    models.SkillTag(id="4", name="Connectors", category="Cohesion")
+                ]
+                db.add_all(new_tags)
+                db.commit()
+                tags = new_tags
+
+            # Populate initial progress for the dummy user
+            progress = [
+                models.UserProgress(user_id=1, skill_tag_id="1", mastery_score=45),
+                models.UserProgress(user_id=1, skill_tag_id="2", mastery_score=50),
+                models.UserProgress(user_id=1, skill_tag_id="3", mastery_score=65),
+                models.UserProgress(user_id=1, skill_tag_id="4", mastery_score=80)
+            ]
+            db.add_all(progress)
+            db.commit()
+    finally:
+        db.close()
 
 app.add_middleware(
     CORSMiddleware,
