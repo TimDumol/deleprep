@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   BookOpen,
   Edit3,
@@ -125,26 +125,85 @@ function App() {
   const [submission, setSubmission] = useState('')
   const [grading, setGrading] = useState<GradingResult | null>(null)
 
-  // Simulation handlers
-  const handleTaskSelect = (task: string) => {
+  const [token, setToken] = useState<string | null>(null)
+  const [skills, setSkills] = useState<SkillTag[]>([])
+
+  const fetchSkills = async (currentToken: string) => {
+    try {
+      const skillsRes = await fetch('/api/skills/', {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      })
+      const skillsData = await skillsRes.json()
+      setSkills(skillsData)
+    } catch (err) {
+      console.error('Failed to fetch skills', err)
+    }
+  }
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const formData = new URLSearchParams()
+        formData.append('username', 'test@example.com')
+        formData.append('password', 'password123')
+
+        const loginRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          body: formData,
+        })
+        const loginData = await loginRes.json()
+        const accessToken = loginData.access_token
+        setToken(accessToken)
+
+        await fetchSkills(accessToken)
+      } catch (err) {
+        console.error('Failed to initialize login', err)
+      }
+    }
+    init()
+  }, [])
+
+  const handleTaskSelect = async (task: string) => {
     setSelectedTask(task)
     setAppState('generating')
 
-    // Simulate AI Generation
-    setTimeout(() => {
-      setPrompt(task === 'Task 1: Email' ? mockPrompt1 : mockPrompt2)
+    try {
+      const res = await fetch('/api/tasks/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ taskType: task }),
+      })
+      const data = await res.json()
+      setPrompt(data)
       setAppState('writing')
-    }, 2500)
+    } catch (err) {
+      console.error(err)
+      setAppState('select-task')
+    }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setAppState('grading')
 
-    // Simulate AI Grading
-    setTimeout(() => {
-      setGrading(mockGrading)
+    try {
+      const res = await fetch('/api/tasks/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ submission, prompt }),
+      })
+      const data = await res.json()
+      setGrading(data)
       setAppState('feedback')
-    }, 3500)
+    } catch (err) {
+      console.error(err)
+      setAppState('writing')
+    }
   }
 
   const handleReset = () => {
@@ -153,6 +212,10 @@ function App() {
     setPrompt(null)
     setSubmission('')
     setGrading(null)
+
+    if (token) {
+      fetchSkills(token)
+    }
   }
 
   const wordCount = submission
@@ -199,7 +262,7 @@ function App() {
                 Current Weaknesses
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {mockSkills
+                {skills
                   .filter((s) => s.score <= 65)
                   .map((skill) => (
                     <div
