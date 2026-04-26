@@ -10,11 +10,12 @@ router = APIRouter(
 @router.post("/generate", response_model=schemas.PromptResponse)
 async def generate_task_prompt(
     request: schemas.PromptGenerateRequest,
-    current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
 ):
+    # Temporarily bypass auth for MVP
+    user_id = 1
     progress = db.query(models.UserProgress).filter(
-        models.UserProgress.user_id == current_user.id
+        models.UserProgress.user_id == user_id
     ).order_by(models.UserProgress.mastery_score.asc()).limit(3).all()
 
     weak_skill_names = []
@@ -26,7 +27,7 @@ async def generate_task_prompt(
     prompt_dict = await ai.generate_prompt(request.taskType, weak_skill_names)
 
     new_submission = models.TaskSubmission(
-        user_id=current_user.id,
+        user_id=user_id,
         task_type=prompt_dict["taskType"],
         scenario=prompt_dict["scenario"],
         bullet_points=prompt_dict["bulletPoints"],
@@ -40,13 +41,14 @@ async def generate_task_prompt(
 @router.post("/submit", response_model=schemas.GradingResult)
 async def submit_task(
     request: schemas.SubmissionRequest,
-    current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
 ):
+    # Temporarily bypass auth for MVP
+    user_id = 1
     grading_dict = await ai.grade_submission(request.submission, request.prompt.targetSkills)
 
     submission = db.query(models.TaskSubmission).filter(
-        models.TaskSubmission.user_id == current_user.id,
+        models.TaskSubmission.user_id == user_id,
         models.TaskSubmission.task_type == request.prompt.taskType,
         models.TaskSubmission.submission_text.is_(None)
     ).order_by(models.TaskSubmission.id.desc()).first()
@@ -72,7 +74,7 @@ async def submit_task(
             tag = db.query(models.SkillTag).filter(models.SkillTag.name == success_tag_name).first()
             if tag:
                 prog = db.query(models.UserProgress).filter(
-                    models.UserProgress.user_id == current_user.id,
+                    models.UserProgress.user_id == user_id,
                     models.UserProgress.skill_tag_id == tag.id
                 ).first()
                 if prog:
@@ -82,7 +84,7 @@ async def submit_task(
             tag = db.query(models.SkillTag).filter(models.SkillTag.name == failed_tag_name).first()
             if tag:
                 prog = db.query(models.UserProgress).filter(
-                    models.UserProgress.user_id == current_user.id,
+                    models.UserProgress.user_id == user_id,
                     models.UserProgress.skill_tag_id == tag.id
                 ).first()
                 if prog:

@@ -262,29 +262,30 @@ function App() {
                 Current Weaknesses
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {skills
-                  .filter((s) => s.score <= 65)
-                  .map((skill) => (
-                    <div
-                      key={skill.id}
-                      className="p-4 rounded-xl bg-slate-50 border border-slate-100"
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium text-slate-700">
-                          {skill.name}
-                        </span>
-                        <span className="text-sm font-bold text-amber-600">
-                          {skill.score}%
-                        </span>
+                {Array.isArray(skills) &&
+                  skills
+                    .filter((s) => s.score <= 65)
+                    .map((skill) => (
+                      <div
+                        key={skill.id}
+                        className="p-4 rounded-xl bg-slate-50 border border-slate-100"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-slate-700">
+                            {skill.name}
+                          </span>
+                          <span className="text-sm font-bold text-amber-600">
+                            {skill.score}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-2">
+                          <div
+                            className="bg-amber-500 h-2 rounded-full"
+                            style={{ width: `${skill.score}%` }}
+                          ></div>
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2">
-                        <div
-                          className="bg-amber-500 h-2 rounded-full"
-                          style={{ width: `${skill.score}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
               </div>
             </div>
 
