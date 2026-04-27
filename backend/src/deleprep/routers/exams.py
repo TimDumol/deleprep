@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from datetime import datetime, timedelta
-import json
 from .. import models, schemas, database, ai, auth
 
 router = APIRouter(
@@ -16,22 +16,26 @@ async def generate_exam(
 ):
     user_id = current_user.id
 
+    # Get all valid skills for the LLM
+    all_tags = db.execute(select(models.SkillTag)).scalars().all()
+    valid_skill_names = [t.name for t in all_tags]
+
     # Get user's weak skills (e.g. lowest mastery scores, maybe due for review)
     # For now, just pick the 3 lowest mastery score tags to drill down on weak points
-    progress = db.query(models.UserProgress).filter(
-        models.UserProgress.user_id == user_id
-    ).order_by(models.UserProgress.mastery_score.asc()).limit(3).all()
+    stmt = select(models.UserProgress).filter_by(user_id=user_id).order_by(models.UserProgress.mastery_score.asc()).limit(3)
+    progress = db.execute(stmt).scalars().all()
 
     weak_skill_names = []
     for p in progress:
-        tag = db.query(models.SkillTag).filter(models.SkillTag.id == p.skill_tag_id).first()
+        tag = db.execute(select(models.SkillTag).filter_by(id=p.skill_tag_id)).scalar_one_or_none()
         if tag:
             weak_skill_names.append(tag.name)
 
     if not weak_skill_names:
         weak_skill_names = ["General A2 Grammar", "General A2 Vocabulary"]
+        valid_skill_names.extend(weak_skill_names) # In case they aren't seeded
 
-    exam_dict = await ai.generate_exam(weak_skill_names)
+    exam_dict = await ai.generate_exam(weak_skill_names, valid_skill_names)
 
     new_session = models.ExamSession(
         user_id=user_id,
@@ -54,10 +58,9 @@ async def submit_exam(
 ):
     user_id = current_user.id
 
-    session = db.query(models.ExamSession).filter(
-        models.ExamSession.id == request.session_id,
-        models.ExamSession.user_id == user_id
-    ).first()
+    session = db.execute(
+        select(models.ExamSession).filter_by(id=request.session_id, user_id=user_id)
+    ).scalar_one_or_none()
 
     if not session:
         raise HTTPException(status_code=404, detail="Exam session not found")
@@ -67,51 +70,73 @@ async def submit_exam(
     score = 0
     feedback_list = []
 
+    # Track performance per tag across the entire exam to do bulk updates
+    # so multiple questions on the same skill don't push repetition out wildly
+    tag_performance = {} # tag_name -> {'correct': int, 'incorrect': int}
+
     for q in questions:
         q_id = q["id"]
-        user_answer = request.answers.get(q_id, "")
-        correct_answer = q["correct_answer"]
-        is_correct = user_answer == correct_answer
+        user_answer_idx = request.answers.get(q_id, -1)
+        correct_idx = q["correct_option_index"]
+        is_correct = user_answer_idx == correct_idx
 
         if is_correct:
             score += 1
 
-        skill_tag_name = q["skill_tag"]
-        tag = db.query(models.SkillTag).filter(models.SkillTag.name == skill_tag_name).first()
-        spaced_rep_msg = ""
-
-        if tag:
-            prog = db.query(models.UserProgress).filter(
-                models.UserProgress.user_id == user_id,
-                models.UserProgress.skill_tag_id == tag.id
-            ).first()
-
-            if prog:
-                if is_correct:
-                    prog.mastery_score = min(100.0, prog.mastery_score + 2.0)
-                    prog.repetition_level += 1
-                else:
-                    prog.mastery_score = max(0.0, prog.mastery_score - 1.0)
-                    prog.repetition_level = max(0, prog.repetition_level - 1)
-
-                # Calculate next review date based on repetition level
-                days_to_add = 2 ** prog.repetition_level if prog.repetition_level > 0 else 1
-                prog.next_review = datetime.utcnow() + timedelta(days=days_to_add)
-
-                if days_to_add == 1:
-                    spaced_rep_msg = "Review Tomorrow"
-                else:
-                    spaced_rep_msg = f"Review in {days_to_add} days"
+        skill_tags = q.get("skill_tags", [])
+        for t in skill_tags:
+            if t not in tag_performance:
+                tag_performance[t] = {'correct': 0, 'incorrect': 0}
+            if is_correct:
+                tag_performance[t]['correct'] += 1
+            else:
+                tag_performance[t]['incorrect'] += 1
 
         feedback_list.append({
             "question_id": q_id,
             "is_correct": is_correct,
-            "selected_answer": user_answer,
-            "correct_answer": correct_answer,
-            "explanation": q["explanation"],
-            "skill_tag": skill_tag_name,
-            "spaced_repetition_update": spaced_rep_msg
+            "selected_option_index": user_answer_idx,
+            "correct_option_index": correct_idx,
+            "explanation": q.get("explanation", ""),
+            "skill_tags": skill_tags,
+            "spaced_repetition_update": "Pending..." # Overwritten shortly
         })
+
+    # Bulk update skill tags progress
+    tag_messages = {}
+    for tag_name, perfs in tag_performance.items():
+        tag = db.execute(select(models.SkillTag).filter_by(name=tag_name)).scalar_one_or_none()
+        if tag:
+            prog = db.execute(select(models.UserProgress).filter_by(user_id=user_id, skill_tag_id=tag.id)).scalar_one_or_none()
+            if prog:
+                # Net impact on repetition
+                net_correct = perfs['correct'] - perfs['incorrect']
+                if net_correct > 0:
+                    prog.mastery_score = min(100.0, prog.mastery_score + 2.0)
+                    prog.repetition_level += 1
+                elif net_correct < 0:
+                    prog.mastery_score = max(0.0, prog.mastery_score - 1.0)
+                    prog.repetition_level = max(0, prog.repetition_level - 1)
+                # If net 0, leave repetition alone but maybe adjust score slightly? Let's leave both alone.
+
+                days_to_add = 2 ** prog.repetition_level if prog.repetition_level > 0 else 1
+                prog.next_review = datetime.utcnow() + timedelta(days=days_to_add)
+
+                if days_to_add == 1:
+                    tag_messages[tag_name] = "Review Tomorrow"
+                else:
+                    tag_messages[tag_name] = f"Review in {days_to_add} days"
+
+    # Populate final spaced repetition strings
+    for f in feedback_list:
+        msgs = []
+        for t in f["skill_tags"]:
+            if t in tag_messages:
+                msgs.append(f"{t}: {tag_messages[t]}")
+        if msgs:
+            f["spaced_repetition_update"] = " | ".join(msgs)
+        else:
+            f["spaced_repetition_update"] = "No update"
 
     # Save submission
     new_submission = models.ExamSubmission(
