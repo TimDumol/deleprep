@@ -144,8 +144,8 @@ function App() {
     const init = async () => {
       try {
         const formData = new URLSearchParams()
-        formData.append('username', 'test@example.com')
-        formData.append('password', 'password123')
+        formData.append('username', import.meta.env.VITE_TEST_USER_EMAIL || 'test@example.com')
+        formData.append('password', import.meta.env.VITE_TEST_USER_PASSWORD || 'password123')
 
         const loginRes = await fetch('/api/auth/login', {
           method: 'POST',

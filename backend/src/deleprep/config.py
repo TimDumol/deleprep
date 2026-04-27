@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     database_url: str = "postgresql://deleprep_user:deleprep_password@localhost/deleprep_db"
+    test_user_email: str = "test@example.com"
+    test_user_password: str = "password123"
 
     class Config:
         env_file = ".env"

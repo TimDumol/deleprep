@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from .routers import auth, skills, tasks
 from .database import engine, Base, SessionLocal
 from . import models, auth as auth_utils
+from .config import settings
 
 Base.metadata.create_all(bind=engine)
 
@@ -13,11 +14,16 @@ app = FastAPI(title="DELE A2 Prep API")
 def create_dummy_user():
     db = SessionLocal()
     try:
-        user = db.query(models.User).filter(models.User.id == 1).first()
+        # Check by email first, then by ID to allow email updates or ID mismatch
+        user = db.query(models.User).filter(models.User.email == settings.test_user_email).first()
         if not user:
-            # Auto-create user with dummy email and hashed password if missing
-            hashed_pw = auth_utils.get_password_hash("password123")
-            dummy_user = models.User(id=1, email="test@example.com", hashed_password=hashed_pw)
+            user = db.query(models.User).filter(models.User.id == 1).first()
+
+        hashed_pw = auth_utils.get_password_hash(settings.test_user_password)
+
+        if not user:
+            # Auto-create user with email and hashed password if missing
+            dummy_user = models.User(id=1, email=settings.test_user_email, hashed_password=hashed_pw)
             db.add(dummy_user)
             db.commit()
 
