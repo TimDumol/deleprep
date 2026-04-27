@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
   BookOpen,
   Edit3,
@@ -10,6 +11,7 @@ import {
   TrendingUp,
   AlertTriangle,
   PlayCircle,
+  FileQuestion,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: App })
@@ -326,6 +328,32 @@ function App() {
                     </span>
                   </div>
                 </button>
+
+                <Link
+                  to="/exam"
+                  className="text-left bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all group block col-span-1 md:col-span-2"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600">
+                      <FileQuestion className="w-6 h-6" />
+                    </div>
+                    <ChevronRight className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                  </div>
+                  <h4 className="text-lg font-bold mb-2">
+                    Mock Exam: Multiple Choice
+                  </h4>
+                  <p className="text-slate-500 text-sm mb-4">
+                    Take a personalized multiple-choice exam targeting your weakest points and unexplored skills. Spaced repetition included!
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-md">
+                      Targeted Practice
+                    </span>
+                    <span className="text-xs font-medium px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200">
+                      Spaced Repetition
+                    </span>
+                  </div>
+                </Link>
               </div>
             </div>
           </div>
