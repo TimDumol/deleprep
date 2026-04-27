@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from .routers import auth, skills, tasks
+from .routers import auth, skills, tasks, exams
 from .database import engine, Base, SessionLocal
 from . import models, auth as auth_utils
 from .config import settings
@@ -63,6 +63,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(skills.router)
 app.include_router(tasks.router)
+app.include_router(exams.router)
 
 @app.get("/health")
 def health_check():

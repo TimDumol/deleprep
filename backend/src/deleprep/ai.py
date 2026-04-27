@@ -28,6 +28,17 @@ class GradeResponse(BaseModel):
     failedTags: List[str]
     overallFeedback: str
 
+class ExamQuestionParsed(BaseModel):
+    id: str
+    text: str
+    options: List[str]
+    correct_answer: str
+    skill_tag: str
+    explanation: str
+
+class ExamGenerateParsed(BaseModel):
+    questions: List[ExamQuestionParsed]
+
 async def generate_prompt(task_type: str, weak_skills: List[str]) -> Dict:
     system_prompt = (
         "You are a helpful assistant for DELE A2 writing preparation. "
@@ -43,6 +54,28 @@ async def generate_prompt(task_type: str, weak_skills: List[str]) -> Dict:
             {"role": "user", "content": user_prompt}
         ],
         response_format=PromptResponse,
+    )
+
+    return json.loads(completion.choices[0].message.content)
+
+async def generate_exam(weak_skills: List[str]) -> Dict:
+    system_prompt = (
+        "You are an expert DELE A2 examiner. "
+        "Generate a targeted multiple-choice exam focusing on the student's weak skills. "
+        "The response MUST be a JSON object with 'questions', which is a list of objects containing "
+        "'id' (string), 'text' (the question), 'options' (list of 4 string options), "
+        "'correct_answer' (string matching one option), 'skill_tag' (string matching the target skill), "
+        "and 'explanation' (string explaining why the answer is correct)."
+    )
+    user_prompt = f"Weak skills: {weak_skills}"
+
+    completion = await client.beta.chat.completions.parse(
+        model=settings.openai_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        response_format=ExamGenerateParsed,
     )
 
     return json.loads(completion.choices[0].message.content)

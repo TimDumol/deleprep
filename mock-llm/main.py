@@ -35,6 +35,28 @@ async def create_chat_completion(request: Request):
             ],
             "targetSkills": ["Pretérito Indefinido", "Pretérito Imperfecto"]
         }
+    elif "Generate a targeted multiple-choice exam" in system_prompt:
+        # Exam generation mock response
+        mock_response = {
+            "questions": [
+                {
+                    "id": "q1",
+                    "text": "Choose the correct form to complete the sentence: Ayer, yo ______ a la tienda.",
+                    "options": ["voy", "fui", "iba", "iré"],
+                    "correct_answer": "fui",
+                    "skill_tag": "Pretérito Indefinido",
+                    "explanation": "'Fui' is the correct Pretérito Indefinido form of 'ir' for 'yo' when referring to a completed action in the past ('Ayer')."
+                },
+                {
+                    "id": "q2",
+                    "text": "Choose the correct form to complete the sentence: Cuando era niño, yo siempre ______ en el parque.",
+                    "options": ["jugaba", "jugué", "juego", "jugaré"],
+                    "correct_answer": "jugaba",
+                    "skill_tag": "Pretérito Imperfecto",
+                    "explanation": "'Jugaba' is the correct Pretérito Imperfecto form to describe a repeated or habitual action in the past ('Cuando era niño', 'siempre')."
+                }
+            ]
+        }
     else:
         # Grading mock response
         mock_response = {
