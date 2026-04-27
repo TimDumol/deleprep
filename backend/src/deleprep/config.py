@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     test_user_email: str = "test@example.com"
     test_user_password: str = "password123"
 
+    openai_api_key: str = "mock"
+    openai_base_url: str = "http://localhost:8080/v1"
+    openai_model: str = "gpt-4o-mini"
+
     class Config:
         env_file = ".env"
 

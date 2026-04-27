@@ -20,11 +20,21 @@ services:
       - DATABASE_URL=postgresql://deleprep_user:deleprep_password@db:5432/deleprep_db
       - TEST_USER_EMAIL=test@example.com
       - TEST_USER_PASSWORD=password123
+      - OPENAI_API_KEY=mock
+      - OPENAI_BASE_URL=http://mock-llm:8080/v1
     depends_on:
       - db
+      - mock-llm
     volumes:
       - ./backend:/app
       - backend_cache:/root/.cache/uv
+
+  mock-llm:
+    build:
+      context: ./mock-llm
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
 
   frontend:
     build:

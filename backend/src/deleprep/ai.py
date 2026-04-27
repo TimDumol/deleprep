@@ -1,51 +1,69 @@
-import asyncio
 from typing import List, Dict
+from pydantic import BaseModel
+from openai import AsyncOpenAI
+from .config import settings
+import json
+
+client = AsyncOpenAI(
+    api_key=settings.openai_api_key,
+    base_url=settings.openai_base_url,
+)
+
+class PromptResponse(BaseModel):
+    taskType: str
+    scenario: str
+    bulletPoints: List[str]
+    targetSkills: List[str]
+
+class Correction(BaseModel):
+    original: str
+    correction: str
+    explanation: str
+
+class GradeResponse(BaseModel):
+    score: int
+    verdict: str
+    corrections: List[Correction]
+    succeededTags: List[str]
+    failedTags: List[str]
+    overallFeedback: str
 
 async def generate_prompt(task_type: str, weak_skills: List[str]) -> Dict:
-    await asyncio.sleep(0.5)
-    if "Email" in task_type:
-        return {
-            "taskType": "Task 1: Email",
-            "scenario": "Write an email to a friend telling them about a recent trip you took.",
-            "bulletPoints": [
-                "Where did you go and when?",
-                "What did you do there? (Use Pretérito Indefinido)",
-                "What was the place like? (Use Pretérito Imperfecto)",
-                "Suggest a plan to meet and show them photos."
-            ],
-            "targetSkills": weak_skills if weak_skills else ["Pretérito Indefinido", "Pretérito Imperfecto"]
-        }
-    else:
-        return {
-            "taskType": "Task 2: Narrative",
-            "scenario": "Write a short story about your first day at a new job or school.",
-            "bulletPoints": [
-                "Describe the setting and how you felt. (Use Pretérito Imperfecto)",
-                "Explain what happened during the day. (Use Pretérito Indefinido)",
-                "Mention who you met and what they were like.",
-                "Say how the day ended."
-            ],
-            "targetSkills": weak_skills if weak_skills else ["Pretérito Indefinido", "Pretérito Imperfecto", "Vocabulary: Work/Study"]
-        }
+    system_prompt = (
+        "You are a helpful assistant for DELE A2 writing preparation. "
+        "Generate a writing task for a student based on their requested task type and their weak skills. "
+        "The response MUST be a JSON object with 'taskType', 'scenario', 'bulletPoints', and 'targetSkills'."
+    )
+    user_prompt = f"Task type: {task_type}. Weak skills: {weak_skills}"
+
+    completion = await client.beta.chat.completions.parse(
+        model=settings.openai_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        response_format=PromptResponse,
+    )
+
+    return json.loads(completion.choices[0].message.content)
 
 async def grade_submission(submission_text: str, target_skills: List[str]) -> Dict:
-    await asyncio.sleep(0.5)
-    return {
-        "score": 2,
-        "verdict": "Pass",
-        "corrections": [
-            {
-                "original": "El hotel era muy bonito y tuvo una piscina.",
-                "correction": "El hotel era muy bonito y tenía una piscina.",
-                "explanation": "Use Pretérito Imperfecto (\"tenía\") for descriptions in the past, not Indefinido (\"tuvo\")."
-            },
-            {
-                "original": "Yo fui al playa todos los días.",
-                "correction": "Yo fui a la playa todos los días.",
-                "explanation": "\"Playa\" is feminine, so use \"a la\" instead of \"al\" (a + el)."
-            }
+    system_prompt = (
+        "You are an expert DELE A2 examiner. "
+        "Evaluate the student's submission text based on DELE A2 rubrics (Coherence, Fluency, Correctness, Scope). "
+        "The response MUST be a JSON object with 'score' (0-3), 'verdict' (Pass/Fail), "
+        "'corrections' (list of {original, correction, explanation}), 'succeededTags', "
+        "'failedTags', and 'overallFeedback'."
+    )
+    user_prompt = f"Target skills: {target_skills}\n\nSubmission: {submission_text}"
+
+    completion = await client.beta.chat.completions.parse(
+        model=settings.openai_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
         ],
-        "succeededTags": [target_skills[0]] if target_skills else ["Pretérito Indefinido"],
-        "failedTags": [target_skills[1]] if len(target_skills) > 1 else ["Pretérito Imperfecto"],
-        "overallFeedback": "Good effort! You successfully used the Pretérito Indefinido to narrate events, but remember to use the Pretérito Imperfecto for descriptions in the past."
-    }
+        response_format=GradeResponse,
+    )
+
+    return json.loads(completion.choices[0].message.content)
