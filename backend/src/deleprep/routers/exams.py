@@ -83,8 +83,16 @@ async def submit_exam(
         if is_correct:
             score += 1
 
-        skill_tags = q.get("skill_tags", [])
-        for t in skill_tags:
+        raw_skill_tags = q.get("skill_tags", [])
+        valid_skill_tags = []
+
+        # Deterministically filter out any hallucinated tags
+        for t in raw_skill_tags:
+            tag_exists = db.execute(select(models.SkillTag).filter_by(name=t)).scalar_one_or_none()
+            if tag_exists:
+                valid_skill_tags.append(t)
+
+        for t in valid_skill_tags:
             if t not in tag_performance:
                 tag_performance[t] = {'correct': 0, 'incorrect': 0}
             if is_correct:
@@ -98,7 +106,7 @@ async def submit_exam(
             "selected_option_index": user_answer_idx,
             "correct_option_index": correct_idx,
             "explanation": q.get("explanation", ""),
-            "skill_tags": skill_tags,
+            "skill_tags": valid_skill_tags,
             "spaced_repetition_update": "Pending..." # Overwritten shortly
         })
 
