@@ -7,10 +7,10 @@ os.environ["OPENAI_API_KEY"] = "mock"
 @pytest.mark.asyncio
 async def test_generate_prompt():
     res = await generate_prompt("Email", ["Pretérito Indefinido"])
-    assert "taskType" in res
-    assert res["taskType"] == "Task 1: Email"
-    assert "bulletPoints" in res
-    assert len(res["bulletPoints"]) == 4
+    assert "task_type" in res
+    assert res["task_type"] == "Task 1: Email"
+    assert "bullet_points" in res
+    assert len(res["bullet_points"]) == 4
 
 @pytest.mark.asyncio
 async def test_grade_submission():
@@ -19,4 +19,4 @@ async def test_grade_submission():
     assert res["score"] == 2
     assert "corrections" in res
     assert len(res["corrections"]) == 1
-    assert "overallFeedback" in res
+    assert "overall_feedback" in res

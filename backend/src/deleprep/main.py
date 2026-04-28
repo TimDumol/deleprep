@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from .routers import auth, skills, tasks
+from .routers import auth, skills, tasks, exams
 from .database import engine, Base, SessionLocal
 from . import models, auth as auth_utils
 from .config import settings
@@ -14,10 +13,12 @@ app = FastAPI(title="DELE A2 Prep API")
 def create_dummy_user():
     db = SessionLocal()
     try:
+        from sqlalchemy import select
+
         # Check by email first, then by ID to allow email updates or ID mismatch
-        user = db.query(models.User).filter(models.User.email == settings.test_user_email).first()
+        user = db.execute(select(models.User).filter_by(email=settings.test_user_email)).scalar_one_or_none()
         if not user:
-            user = db.query(models.User).filter(models.User.id == 1).first()
+            user = db.execute(select(models.User).filter_by(id=1)).scalar_one_or_none()
 
         hashed_pw = auth_utils.get_password_hash(settings.test_user_password)
 
@@ -28,7 +29,7 @@ def create_dummy_user():
             db.commit()
 
             # Optionally populate some tags to avoid foreign key errors on progress
-            tags = db.query(models.SkillTag).all()
+            tags = db.execute(select(models.SkillTag)).scalars().all()
             if not tags:
                 new_tags = [
                     models.SkillTag(id="1", name="Pretérito Indefinido", category="Grammar"),
@@ -63,6 +64,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(skills.router)
 app.include_router(tasks.router)
+app.include_router(exams.router)
 
 @app.get("/health")
 def health_check():

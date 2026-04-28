@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import select
 from .. import models, schemas, database, auth
 
 router = APIRouter(
@@ -8,14 +8,17 @@ router = APIRouter(
     tags=["Skills"]
 )
 
-@router.get("/", response_model=List[schemas.SkillTagSchema])
-def get_user_skills(db: Session = Depends(database.get_db)):
-    # Temporarily hardcode user ID for MVP testing to bypass authentication
-    progress_records = db.query(models.UserProgress).filter(models.UserProgress.user_id == 1).all()
+@router.get("/", response_model=list[schemas.SkillTagSchema])
+def get_user_skills(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    user_id = current_user.id
+    progress_records = db.execute(select(models.UserProgress).filter_by(user_id=user_id)).scalars().all()
 
     result = []
     for p in progress_records:
-        tag = db.query(models.SkillTag).filter(models.SkillTag.id == p.skill_tag_id).first()
+        tag = db.execute(select(models.SkillTag).filter_by(id=p.skill_tag_id)).scalar_one_or_none()
         if tag:
             result.append(schemas.SkillTagSchema(
                 id=tag.id,

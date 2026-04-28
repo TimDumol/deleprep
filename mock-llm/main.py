@@ -25,15 +25,37 @@ async def create_chat_completion(request: Request):
     if "Generate a writing task" in system_prompt:
         # Prompt generation mock response
         mock_response = {
-            "taskType": "Task 1: Email",
+            "task_type": "Task 1: Email",
             "scenario": "Write an email to a friend telling them about a recent trip you took.",
-            "bulletPoints": [
+            "bullet_points": [
                 "Where did you go and when?",
                 "What did you do there? (Use Pretérito Indefinido)",
                 "What was the place like? (Use Pretérito Imperfecto)",
                 "Suggest a plan to meet and show them photos."
             ],
-            "targetSkills": ["Pretérito Indefinido", "Pretérito Imperfecto"]
+            "target_skills": ["Pretérito Indefinido", "Pretérito Imperfecto"]
+        }
+    elif "Generate a targeted multiple-choice exam" in system_prompt:
+        # Exam generation mock response
+        mock_response = {
+            "questions": [
+                {
+                    "id": "q1",
+                    "text": "Choose the correct form to complete the sentence: Ayer, yo ______ a la tienda.",
+                    "options": ["voy", "fui", "iba", "iré"],
+                    "correct_option_index": 1,
+                    "skill_tags": ["Pretérito Indefinido"],
+                    "explanation": "'Fui' is the correct Pretérito Indefinido form of 'ir' for 'yo' when referring to a completed action in the past ('Ayer')."
+                },
+                {
+                    "id": "q2",
+                    "text": "Choose the correct form to complete the sentence: Cuando era niño, yo siempre ______ en el parque.",
+                    "options": ["jugaba", "jugué", "juego", "jugaré"],
+                    "correct_option_index": 0,
+                    "skill_tags": ["Pretérito Imperfecto"],
+                    "explanation": "'Jugaba' is the correct Pretérito Imperfecto form to describe a repeated or habitual action in the past ('Cuando era niño', 'siempre')."
+                }
+            ]
         }
     else:
         # Grading mock response
@@ -47,9 +69,9 @@ async def create_chat_completion(request: Request):
                     "explanation": "Use Pretérito Imperfecto (\"tenía\") for descriptions in the past, not Indefinido (\"tuvo\")."
                 }
             ],
-            "succeededTags": ["Pretérito Indefinido"],
-            "failedTags": ["Pretérito Imperfecto"],
-            "overallFeedback": "Good effort!"
+            "succeeded_tags": ["Pretérito Indefinido"],
+            "failed_tags": ["Pretérito Imperfecto"],
+            "overall_feedback": "Good effort!"
         }
 
     return {
